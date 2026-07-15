@@ -1,0 +1,485 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>宝塔面板 SSH 部署功能 — 完整说明</title>
+<style>
+  :root {
+    --bg: #f8f9fa;
+    --card-bg: #ffffff;
+    --text: #1a1a2e;
+    --text-secondary: #555;
+    --accent: #2563eb;
+    --accent-light: #dbeafe;
+    --green: #16a34a;
+    --green-light: #dcfce7;
+    --orange: #ea580c;
+    --orange-light: #ffedd5;
+    --red: #dc2626;
+    --red-light: #fee2e2;
+    --border: #e2e8f0;
+    --code-bg: #f1f5f9;
+    --code-text: #334155;
+  }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    font-family: -apple-system, "Segoe UI", "Microsoft YaHei", sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    line-height: 1.7;
+    padding: 0;
+  }
+  .hero {
+    background: linear-gradient(135deg, #1e3a5f 0%, #2563eb 100%);
+    color: #fff;
+    padding: 48px 32px;
+    text-align: center;
+  }
+  .hero h1 { font-size: 28px; font-weight: 700; margin-bottom: 8px; }
+  .hero p { font-size: 15px; opacity: 0.9; }
+  .hero .tags { margin-top: 16px; display: flex; gap: 8px; justify-content: center; flex-wrap: wrap; }
+  .hero .tag {
+    background: rgba(255,255,255,0.15);
+    border: 1px solid rgba(255,255,255,0.3);
+    border-radius: 20px;
+    padding: 4px 14px;
+    font-size: 13px;
+  }
+  .container { max-width: 900px; margin: 0 auto; padding: 32px 24px; }
+
+  .section { margin-bottom: 36px; }
+  .section-title {
+    font-size: 20px;
+    font-weight: 700;
+    margin-bottom: 16px;
+    padding-bottom: 8px;
+    border-bottom: 2px solid var(--accent);
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  .section-title .num {
+    background: var(--accent);
+    color: #fff;
+    width: 28px; height: 28px;
+    border-radius: 50%;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 14px;
+  }
+
+  .card {
+    background: var(--card-bg);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 20px 24px;
+    margin-bottom: 16px;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+  }
+  .card h3 { font-size: 16px; margin-bottom: 10px; color: var(--text); }
+  .card p { color: var(--text-secondary); font-size: 14px; margin-bottom: 8px; }
+  .card ul { list-style: none; padding: 0; }
+  .card ul li {
+    font-size: 14px;
+    color: var(--text-secondary);
+    padding: 4px 0 4px 20px;
+    position: relative;
+  }
+  .card ul li::before {
+    content: "▸";
+    position: absolute;
+    left: 0;
+    color: var(--accent);
+  }
+
+  .mode-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-bottom: 16px; }
+  @media (max-width: 640px) { .mode-grid { grid-template-columns: 1fr; } }
+  .mode-card {
+    border-radius: 10px;
+    padding: 20px;
+    border: 1px solid var(--border);
+  }
+  .mode-card.a { background: var(--accent-light); border-color: #93c5fd; }
+  .mode-card.b { background: var(--green-light); border-color: #86efac; }
+  .mode-card h3 { font-size: 15px; margin-bottom: 8px; }
+  .mode-card .badge {
+    display: inline-block;
+    font-size: 12px;
+    font-weight: 600;
+    padding: 2px 10px;
+    border-radius: 12px;
+    margin-bottom: 10px;
+  }
+  .mode-card.a .badge { background: var(--accent); color: #fff; }
+  .mode-card.b .badge { background: var(--green); color: #fff; }
+  .mode-card p { font-size: 13px; color: var(--text-secondary); }
+
+  .flow { display: flex; flex-direction: column; gap: 0; }
+  .flow-step {
+    display: flex;
+    gap: 16px;
+    padding: 14px 0;
+    border-bottom: 1px solid var(--border);
+  }
+  .flow-step:last-child { border-bottom: none; }
+  .flow-step .step-num {
+    flex-shrink: 0;
+    width: 32px; height: 32px;
+    border-radius: 50%;
+    background: var(--accent);
+    color: #fff;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 14px; font-weight: 600;
+  }
+  .flow-step .step-content h4 { font-size: 14px; margin-bottom: 4px; }
+  .flow-step .step-content p { font-size: 13px; color: var(--text-secondary); }
+  .flow-step .step-content code {
+    background: var(--code-bg);
+    color: var(--code-text);
+    padding: 2px 6px;
+    border-radius: 4px;
+    font-size: 12px;
+    font-family: "Cascadia Code", "Consolas", monospace;
+  }
+
+  .code-block {
+    background: var(--code-bg);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 16px;
+    margin: 12px 0;
+    overflow-x: auto;
+  }
+  .code-block pre {
+    font-family: "Cascadia Code", "Consolas", monospace;
+    font-size: 13px;
+    color: var(--code-text);
+    white-space: pre-wrap;
+    word-break: break-all;
+  }
+  .code-block .label {
+    font-size: 12px;
+    color: var(--text-secondary);
+    margin-bottom: 8px;
+    font-weight: 600;
+  }
+
+  table { width: 100%; border-collapse: collapse; margin: 12px 0; font-size: 13px; }
+  th { background: var(--accent); color: #fff; padding: 10px 12px; text-align: left; font-weight: 600; }
+  td { padding: 8px 12px; border-bottom: 1px solid var(--border); color: var(--text-secondary); }
+  tr:nth-child(even) td { background: #f8fafc; }
+  td code { background: var(--code-bg); padding: 2px 6px; border-radius: 4px; font-size: 12px; font-family: monospace; }
+
+  .warn { background: var(--orange-light); border-left: 4px solid var(--orange); }
+  .danger { background: var(--red-light); border-left: 4px solid var(--red); }
+  .info { background: var(--accent-light); border-left: 4px solid var(--accent); }
+  .warn, .danger, .info { border-radius: 8px; padding: 14px 18px; margin: 12px 0; }
+  .warn strong, .danger strong, .info strong { font-size: 14px; }
+  .warn p, .danger p, .info p { font-size: 13px; margin-top: 4px; }
+
+  .pitfall-list { display: flex; flex-direction: column; gap: 12px; }
+  .pitfall {
+    background: var(--card-bg);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 14px 18px;
+  }
+  .pitfall .title { font-size: 14px; font-weight: 600; margin-bottom: 6px; display: flex; align-items: center; gap: 8px; }
+  .pitfall .title .icon { font-size: 16px; }
+  .pitfall .desc { font-size: 13px; color: var(--text-secondary); }
+  .pitfall .fix { font-size: 13px; color: var(--green); margin-top: 6px; padding-top: 6px; border-top: 1px dashed var(--border); }
+
+  .env-table td:first-child { font-family: monospace; font-weight: 600; color: var(--accent); white-space: nowrap; }
+  .env-table td:nth-child(2) { font-family: monospace; font-size: 12px; }
+
+  .file-tree {
+    background: #1e293b;
+    color: #cbd5e1;
+    border-radius: 10px;
+    padding: 20px 24px;
+    font-family: "Cascadia Code", "Consolas", monospace;
+    font-size: 13px;
+    line-height: 1.8;
+    overflow-x: auto;
+  }
+  .file-tree .dir { color: #60a5fa; font-weight: 600; }
+  .file-tree .file { color: #93c5fd; }
+  .file-tree .desc { color: #64748b; }
+</style>
+</head>
+<body>
+
+<div class="hero">
+  <h1>宝塔面板 SSH 部署功能</h1>
+  <p>通过 SSH 将 Node.js Web 应用部署到宝塔服务器并公开访问</p>
+  <div class="tags">
+    <span class="tag">SSH 部署</span>
+    <span class="tag">pm2 守护</span>
+    <span class="tag">Nginx 反代</span>
+    <span class="tag">面板原生项目</span>
+    <span class="tag">域名管理</span>
+  </div>
+</div>
+
+<div class="container">
+
+  <!-- 文件结构 -->
+  <div class="section">
+    <div class="section-title"><span class="num">1</span> 功能文件结构</div>
+    <div class="file-tree">
+<span class="dir">baota-ssh-deploy/</span>
+├── <span class="file">SKILL.md</span>                          <span class="desc"># 功能总览 + 完整工作流</span>
+├── <span class="dir">scripts/</span>
+│   ├── <span class="file">ssh_probe.py</span>                  <span class="desc"># SSH 环境探测（只读，不改服务器）</span>
+│   ├── <span class="file">deploy.py</span>                     <span class="desc"># 全量部署（上传+npm install+pm2守护）</span>
+│   ├── <span class="file">deploy_nginx.py</span>               <span class="desc"># Nginx 反向代理配置（80→应用端口）</span>
+│   ├── <span class="file">deploy_update.py</span>              <span class="desc"># 增量更新（上传代码+pm2 restart）</span>
+│   └── <span class="file">register_node_project.py</span>      <span class="desc"># 宝塔面板原生Node项目注册（一键）</span>
+└── <span class="dir">references/</span>
+    ├── <span class="file">gotchas.md</span>                    <span class="desc"># 9个实战踩坑记录与修复方案</span>
+    └── <span class="file">node_project.md</span>               <span class="desc"># 面板原生Node项目操作规范</span>
+    </div>
+  </div>
+
+  <!-- 两大模式 -->
+  <div class="section">
+    <div class="section-title"><span class="num">2</span> 两大部署模式</div>
+    <div class="mode-grid">
+      <div class="mode-card a">
+        <span class="badge">模式 A</span>
+        <h3>裸 SSH 部署 (pm2 + Nginx)</h3>
+        <p>通过 SSH 上传源码，用 pm2 守护进程运行应用，再用 Nginx 做反向代理将 80 端口映射到应用端口。适合快速联调、临时部署。</p>
+        <p style="margin-top:8px;"><strong>特点：</strong>不依赖宝塔面板 API，完全通过 SSH 操作，速度快、可控性强。</p>
+      </div>
+      <div class="mode-card b">
+        <span class="badge">模式 B</span>
+        <h3>面板原生托管项目</h3>
+        <p>通过宝塔内部 Python 模型将应用注册为面板托管的 Node 项目，在面板 UI 中可见、可启停/重启、支持域名管理。</p>
+        <p style="margin-top:8px;"><strong>特点：</strong>面板可视化管理，与其他项目隔离，支持官方域名绑定。</p>
+      </div>
+    </div>
+    <div class="info">
+      <strong>核心决策：用 SSH，不用面板 API</strong>
+      <p>宝塔面板 API 有 IP 白名单（L7 层），未白名单的 IP 访问任何路径都返回 nginx 404（不是真的 404）。SSH（端口 22）通常不在白名单范围内，是可靠路径。面板原生项目也通过 SSH 调用宝塔内部 Python（localhost 调用，绕过 HTTP 白名单）。</p>
+    </div>
+  </div>
+
+  <!-- 模式 A 工作流 -->
+  <div class="section">
+    <div class="section-title"><span class="num">3</span> 模式 A：裸部署工作流</div>
+    <div class="card">
+      <div class="flow">
+        <div class="flow-step">
+          <div class="step-num">0</div>
+          <div class="step-content">
+            <h4>收集连接信息</h4>
+            <p>SSH 主机/端口/用户名、认证方式（密钥优先）、服务器 Web 根目录、应用监听端口（默认 3000）、健康检查端点（默认 <code>/healthz</code>）</p>
+          </div>
+        </div>
+        <div class="flow-step">
+          <div class="step-num">1</div>
+          <div class="step-content">
+            <h4>环境探测 <code>ssh_probe.py</code></h4>
+            <p>只读探测：操作系统、磁盘、宝塔 Node 路径、Nginx 二进制、vhost 目录、监听端口、已有 pm2 进程。可同时追加本地部署公钥。</p>
+          </div>
+        </div>
+        <div class="flow-step">
+          <div class="step-num">2</div>
+          <div class="step-content">
+            <h4>全量部署 <code>deploy.py</code></h4>
+            <p>上传源码（排除 node_modules/data/.git/.env）→ npm install → 生成 ecosystem.config.js（随机 SESSION_SECRET）→ pm2 启动+开机自启 → 健康检查</p>
+          </div>
+        </div>
+        <div class="flow-step">
+          <div class="step-num">3</div>
+          <div class="step-content">
+            <h4>Nginx 反代 <code>deploy_nginx.py</code></h4>
+            <p>将 80 端口代理到 127.0.0.1:应用端口。支持 IP 直连模式（无域名）和域名+SSL 模式。写入面板真实 vhost 目录，nginx -t 通过后才 reload。</p>
+          </div>
+        </div>
+        <div class="flow-step">
+          <div class="step-num">4</div>
+          <div class="step-content">
+            <h4>增量更新 <code>deploy_update.py</code></h4>
+            <p>代码改动后快速更新：重新上传源码 + pm2 restart，跳过耗时的 npm install。</p>
+          </div>
+        </div>
+        <div class="flow-step">
+          <div class="step-num">5</div>
+          <div class="step-content">
+            <h4>验证</h4>
+            <p><code>curl</code> 检查 HTTP 200、测试登录与会话保持（cookie jar 验证代理后 session 不丢）</p>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 模式 B 工作流 -->
+  <div class="section">
+    <div class="section-title"><span class="num">4</span> 模式 B：面板原生项目注册</div>
+    <div class="card">
+      <h3>register_node_project.py — 一键完成</h3>
+      <p>通过 SSH 调用宝塔自带 Python 解释器 <code>/www/server/panel/pyenv/bin/python</code>，直接运行面板内部模型类 <code>projectModel.nodejsModel.main()</code>，在 localhost 层面完成项目注册，完全面板原生。</p>
+      <div class="flow" style="margin-top:12px;">
+        <div class="flow-step">
+          <div class="step-num">1</div>
+          <div class="step-content">
+            <h4>上传源码</h4>
+            <p>排除 node_modules/data/.git/.env，上传到 <code>/www/wwwroot/&lt;域名&gt;/</code></p>
+          </div>
+        </div>
+        <div class="flow-step">
+          <div class="step-num">2</div>
+          <div class="step-content">
+            <h4>npm install</h4>
+            <p>用宝塔自带的 Node（<code>/www/server/nodejs/&lt;ver&gt;/bin/npm</code>）安装生产依赖</p>
+          </div>
+        </div>
+        <div class="flow-step">
+          <div class="step-num">3</div>
+          <div class="step-content">
+            <h4>create_project</h4>
+            <p>用安全名（<code>^\w+$</code> 格式，不带点）创建项目，<code>bind_extranet=0</code> 先不绑外网</p>
+          </div>
+        </div>
+        <div class="flow-step">
+          <div class="step-num">4</div>
+          <div class="step-content">
+            <h4>改名为域名</h4>
+            <p>绕过 <code>^\w+$</code> 限制：改 sites 表 name + project_config + 重命名 pid/sh/log 三个文件</p>
+          </div>
+        </div>
+        <div class="flow-step">
+          <div class="step-num">5</div>
+          <div class="step-content">
+            <h4>绑域名</h4>
+            <p><code>project_add_domain</code> 登记域名 → <code>bind_extranet</code> 开启外网映射 → 自动生成 <code>node_&lt;name&gt;.conf</code> 反代配置</p>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="code-block">
+      <div class="label">使用示例</div>
+<pre>SSH_HOST=110.42.209.211 SSH_USER=root SSH_PWD='&lt;密码&gt;' \
+LOCAL_DIR=/local/markdown-editor REMOTE_DIR=/www/wwwroot/markdown.example.com \
+DOMAIN=markdown.example.com APP_NAME=md_editor REMOTE_PORT=3100 \
+python scripts/register_node_project.py</pre>
+    </div>
+  </div>
+
+  <!-- 环境变量 -->
+  <div class="section">
+    <div class="section-title"><span class="num">5</span> 脚本环境变量参考</div>
+    <table class="env-table">
+      <thead>
+        <tr><th>变量</th><th>默认值</th><th>说明</th></tr>
+      </thead>
+      <tbody>
+        <tr><td>SSH_HOST</td><td>—</td><td>服务器 IP（必填）</td></tr>
+        <tr><td>SSH_PORT</td><td>22</td><td>SSH 端口</td></tr>
+        <tr><td>SSH_USER</td><td>—</td><td>SSH 用户名（通常 root）</td></tr>
+        <tr><td>SSH_KEYFILE</td><td>—</td><td>密钥认证路径（与 SSH_PWD 二选一）</td></tr>
+        <tr><td>SSH_PWD</td><td>—</td><td>密码认证（仅会话内使用，不写入文件）</td></tr>
+        <tr><td>LOCAL_DIR</td><td>—</td><td>本地项目根目录</td></tr>
+        <tr><td>REMOTE_DIR</td><td>—</td><td>远程 Web 根目录，如 /www/wwwroot/your.domain</td></tr>
+        <tr><td>APP_NAME</td><td>app</td><td>pm2 进程名 / 项目安全名</td></tr>
+        <tr><td>REMOTE_PORT</td><td>3000 (模式A) / 3100 (模式B)</td><td>应用监听端口</td></tr>
+        <tr><td>DOMAIN</td><td>—</td><td>站点域名（模式B 绑域名用）</td></tr>
+        <tr><td>BIND_DOMAIN</td><td>yes</td><td>是否绑定域名到面板</td></tr>
+        <tr><td>SKIP_UPLOAD</td><td>no</td><td>跳过上传（应用已在服务器上）</td></tr>
+        <tr><td>DO_NPM</td><td>yes</td><td>是否运行 npm install</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <!-- 关键路径 -->
+  <div class="section">
+    <div class="section-title"><span class="num">6</span> 宝塔服务器关键路径</div>
+    <table>
+      <thead>
+        <tr><th>项目</th><th>路径</th></tr>
+      </thead>
+      <tbody>
+        <tr><td>面板 Python (3.7)</td><td><code>/www/server/panel/pyenv/bin/python</code></td></tr>
+        <tr><td>模型类文件</td><td><code>/www/server/panel/class/projectModel/nodejsModel.py</code></td></tr>
+        <tr><td>宝塔 Node 版本目录</td><td><code>/www/server/nodejs/&lt;ver&gt;/bin</code></td></tr>
+        <tr><td>pm2 二进制</td><td><code>/www/server/nodejs/&lt;ver&gt;/bin/pm2</code></td></tr>
+        <tr><td>Nginx vhost 目录（真实）</td><td><code>/www/server/panel/vhost/nginx/</code></td></tr>
+        <tr><td>Nginx 二进制</td><td><code>/www/server/nginx/sbin/nginx</code></td></tr>
+        <tr><td>面板项目表</td><td><code>/www/server/panel/data/default.db</code> → sites 表</td></tr>
+        <tr><td>项目 pid/脚本/日志</td><td><code>/www/server/nodejs/vhost/{pids,scripts,logs}/&lt;name&gt;.{pid,sh,log}</code></td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <!-- 踩坑清单 -->
+  <div class="section">
+    <div class="section-title"><span class="num">7</span> 实战踩坑清单（9 项）</div>
+    <div class="pitfall-list">
+      <div class="pitfall">
+        <div class="title"><span class="icon">🔒</span> 宝塔面板 API 返回 404 — IP 白名单拦截</div>
+        <div class="desc">未白名单的 IP 访问面板任何路径都返回 nginx 404（不是超时）。看起来像路径错误，实际是 IP 被拦截。</div>
+        <div class="fix">✅ 不走面板 API，改用 SSH（端口 22 通常不在白名单内）。面板原生项目也通过 SSH 调用内部 Python。</div>
+      </div>
+      <div class="pitfall">
+        <div class="title"><span class="icon">📁</span> Nginx vhost 真实目录</div>
+        <div class="desc">手写在 <code>/www/server/nginx/conf/vhost/</code> 的配置不生效。宝塔 nginx.conf include 的是 <code>/www/server/panel/vhost/nginx/</code>。</div>
+        <div class="fix">✅ vhost 文件写入 <code>/www/server/panel/vhost/nginx/&lt;name&gt;.conf</code>，然后 nginx -t && reload。</div>
+      </div>
+      <div class="pitfall">
+        <div class="title"><span class="icon">🚫</span> 云安全组封锁应用端口 (3000)</div>
+        <div class="desc">本地 curl 127.0.0.1:3000 正常，公网访问超时。云安全组只放行 80/443/22/8888。</div>
+        <div class="fix">✅ Nginx 代理 80 → 127.0.0.1:3000，利用已开放的 80 端口，无需改安全组。</div>
+      </div>
+      <div class="pitfall">
+        <div class="title"><span class="icon">👻</span> pm2 孤儿进程</div>
+        <div class="desc">pm2 startup 后 pm2 jlist 为空，但旧 node 进程仍在服务。重启后可能无法恢复。</div>
+        <div class="fix">✅ pm2 kill → pm2 start ecosystem.config.js → pm2 save → 验证 jlist 中有应用名 → pm2 startup。</div>
+      </div>
+      <div class="pitfall">
+        <div class="title"><span class="icon">⚔️</span> 不要同时用面板和 pm2 启动同一应用</div>
+        <div class="desc">两个管理器抢同一端口，面板启动失败或冲突。</div>
+        <div class="fix">✅ 只用一个管理器。选 pm2 则不在面板点"启动"；选面板则先停 pm2 + 删 vhost conf。</div>
+      </div>
+      <div class="pitfall">
+        <div class="title"><span class="icon">🔄</span> 前端 401 → reload 死循环</div>
+        <div class="desc">api() 收到 401 就 location.reload()，导致刷新→未认证→401→刷新→无限循环。</div>
+        <div class="fix">✅ 401 时跳转登录页而非 reload。设置 cookie: httpOnly; sameSite=lax。用户需硬刷新清除缓存。</div>
+      </div>
+      <div class="pitfall">
+        <div class="title"><span class="icon">📛</span> 项目名 ^\w+$ 限制</div>
+        <div class="desc">create_project 拒绝带点的名字（如域名 markdown.example.com）。</div>
+        <div class="fix">✅ 先用安全名（md_editor）创建，再改 sites 表 name + project_config + 重命名 pid/sh/log 文件。</div>
+      </div>
+      <div class="pitfall">
+        <div class="title"><span class="icon">🔌</span> 面板不注入 PORT 环境变量</div>
+        <div class="desc">宝塔 start_project 不会设置 PORT，应用可能落到默认 3000 与其他项目冲突。</div>
+        <div class="fix">✅ server.js 必须自己兜底：<code>const PORT = process.env.PORT || 3100;</code></div>
+      </div>
+      <div class="pitfall">
+        <div class="title"><span class="icon">🗃️</span> sqlite3 CLI 读不到新行 (WAL)</div>
+        <div class="desc">直接用 sqlite3 命令行读 default.db 可能读不到刚写入的行（WAL 未落盘）。</div>
+        <div class="fix">✅ 用面板自己的 public.M() 读取：<code>public.M('sites').where(...).select()</code></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 安全须知 -->
+  <div class="section">
+    <div class="section-title"><span class="num">8</span> 安全须知</div>
+    <div class="danger">
+      <strong>⚠️ 密码与密钥安全</strong>
+      <p>SSH 密码仅通过环境变量在部署时传递，绝不写入项目文件或 memory。优先使用密钥认证：本地生成 ed25519 密钥对，将公钥交给用户追加到 authorized_keys，无需交换秘密。</p>
+    </div>
+    <div class="warn">
+      <strong>⚠️ SESSION_SECRET 生成</strong>
+      <p>部署时由服务器端 <code>os.urandom(24).hex()</code> 生成随机密钥，不硬编码。写入 ecosystem.config.js 的 env 中。</p>
+    </div>
+  </div>
+
+</div>
+
+</body>
+</html>
