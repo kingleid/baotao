@@ -10,10 +10,16 @@ description: |-
   (port 80 → app, bypassing cloud security-group port blocks); and (B) registering the
   app as a MANAGED Baota Node project via the panel's own internal Python model (so it
   appears in the Baota UI under Node项目, supports start/stop/restart + 域名管理, and
-  is isolated from other projects). Both support SSH key OR password auth. It also
+  is isolated from other projects). (C) deploying a pure static HTML site and registering
+  it in the panel 网站 list via the internal `panelSite.AddSite` model (shows in the UI,
+  avoids the site.db data-source pitfall). Both support SSH key OR password auth. It also
   documents the hard-won pitfalls: Baota HTTP panel API 404 from IP whitelist (use SSH
   + internal Python instead), the real vhost path, pm2 orphan processes, project-name
   ^\w+$ restriction, PORT not injected by Baota, and session-cookie infinite-reload.
+  For static sites it also covers: acme.sh's ZeroSSL default CA, install-cert won't
+  mkdir, AddSite overwriting files, the site.db data-source, the Git-Bash path-mangling
+  trap, and the db.Sql-vs-public.M DB-layer mismatch that makes a successful AddSite look
+  like it wrote nothing.
 agent_created: true
 ---
 
@@ -31,7 +37,8 @@ reachable, without relying on the Baota panel API.
 
 Scope: the skill assumes a **Linux server with Baota installed, SSH reachable, and a
 Node.js app** (Express/Next/Nuxt/Koa…) whose entry listens on a single port. For
-non-Node stacks (PHP/Java), only the Nginx reverse-proxy part is reusable.
+non-Node stacks (PHP/Java), only the Nginx reverse-proxy part is reusable. It also covers
+pure static HTML sites (no backend) — see Section 7.
 
 ## Critical decision: use SSH, NOT the panel API
 
@@ -159,7 +166,41 @@ What the script does and the gotchas baked in (full detail in
 - **Port clash**: pick a port other than 3000 (often taken by another project on the
   same box). Check `ss -ltnp | grep :<port>` first.
 
-## 7. Hard-won pitfalls (read references/gotchas.md and references/node_project.md)
+## 7. Static HTML site (纯静态，无后端) — deploy + register in 网站列表
+
+For a pure static site (single/multi-file HTML/CSS/JS, no backend). No pm2, no reverse
+proxy. Flow: upload → issue SSL (acme.sh) → register in the panel `网站` list (so it shows
+in the UI) → write a static Nginx vhost + reload.
+
+Key facts (verified on the Tencent-Cloud-customized Baota · 腾讯云专享版, common on
+Tencent Cloud images — other Baota versions may differ slightly):
+
+- **The panel 网站 list reads `sites`/`domain` from `/www/server/panel/data/db/site.db`**,
+  NOT `/www/server/panel/data/default.db`. `db.Sql` routes by table name via
+  `config/databases.json` (sites/domain → site.db). So **just writing a Nginx vhost will
+  NOT make the site appear in the panel UI** — you must register it in `site.db`.
+- Register cleanly (panel-native, the 规范 way) by running the panel's own model on the
+  server instead of hand-editing the DB:
+  `/www/server/panel/pyenv/bin/python` → `sys.path.insert(0,'/www/server/panel/class')` →
+  `import public, panelSite` → `panelSite.panelSite().AddSite(get)`.
+- `get` is a `public.to_dict_obj({})` with:
+  `webname='{"domain":"<d>","domainlist":["<d>:80"],"count":1}'`,
+  `path='/www/wwwroot/<d>'`, `port='80'`, `version='00'` (pure static; `'00'` is present
+  in `GetPHPVersion`), `ps='备注'`, `ftp='false'`, `sql='false'`, `type_id=0`,
+  `project_type='PHP'`, `deploy_type=''`.
+- **AddSite OVERWRITES root `index.html` and the vhost conf** (`init_site_files` +
+  `nginxAdd`). **Back up both before calling, restore after, then `nginx -s reload`.**
+- AddSite returns a dict containing `siteId` on success. It pings `www.bt.cn`
+  (Tencent-custom reporting) but that does not affect the result; apache/openlitespeed are
+  skipped if not installed.
+- SSL: `acme.sh --set-default-ca --server letsencrypt` first (default CA is ZeroSSL and
+  needs EAB credentials), and `mkdir -p` the cert dir before `--install-cert` (it will not
+  create it). See Section 8 pitfall list.
+
+Verify: query `/www/server/panel/data/db/site.db` `sites` table (NOT `data/default.db`);
+`curl -sI https://<d>` returns `200`.
+
+## 8. Hard-won pitfalls (read references/gotchas.md and references/node_project.md)
 
 1. **Baota HTTP panel API 404 = IP whitelist block** (external caller IP not
    whitelisted → nginx 404 on every path). Use SSH. For a *managed* Node project,
@@ -173,6 +214,56 @@ What the script does and the gotchas baked in (full detail in
 6. **Frontend session bug**: a `401 → location.reload()` handler causes an infinite
    refresh loop. On 401, route to the login screen instead of reloading. Set session
    cookies `HttpOnly; SameParty=Lax` (or `SameSite=Lax`).
+
+### Static-site / panel-registration pitfalls (hard-won during the fanqie deploy)
+
+7. **Local Git-Bash path mangling (running deploy scripts on Windows)**: when you invoke
+   `python.exe script.py` from Git Bash using a `/c/Users/...` path, Git Bash auto-converts
+   it to `c:\c\Users\...` (note the doubled `c:\`), so Python raises "can't open file".
+   **Use Windows-style paths `C:/Users/...`** (forward slashes are fine) for the script path
+   and for any `SSH_*` env vars. This bit every script invocation until switched.
+
+8. **Two DB access layers point to DIFFERENT files** — the #1 cause of "AddSite succeeded
+   but the site isn't in the UI / the DB looks empty". `public.M(...)` reads
+   `data/default.db` (sqlite), but the panel UI's `db.Sql(...)` routes `sites`/`domain`
+   tables to `data/db/site.db` (per `config/databases.json`). After `AddSite` returns a
+   `siteId`, do NOT query `data/default.db.sites` (it stays empty + mtime stale). Query
+   `data/db/site.db.sites`, or better, verify through the panel's own ORM (`db.Sql`) the
+   way the UI does.
+
+9. **`db.Sql` may mirror small DBs to `/dev/shm` and open them read-only**. A bare external
+   `sqlite3 data/db/site.db` connection can show stale or empty rows right after a write
+   (WAL + `/dev/shm` copy). If a query looks empty but `AddSite` clearly returned a `siteId`,
+   re-query via `db.Sql` (the panel loader flushes correctly) instead of a raw external
+   connection — don't conclude the write failed.
+
+10. **`curl size_download=0` is a false alarm** when `-o` is omitted: `curl -s URL -w
+    "size=%{size_download}"` can print 0 even though the full body is served (the metric is
+    unreliable without a write sink). Confirm real size with `curl -s URL -o /tmp/f -w
+    "size=%{size_download}"` (got 29743 for the pomodoro page), or grep the response
+    (`grep -o '<title>[^<]*</title>'`) — a correct title proves the body arrived.
+
+11. **acme.sh default CA is ZeroSSL (needs EAB)** — `--issue` against the default CA silently
+    fails because ZeroSSL requires an email + EAB key id/secret that you don't have. Switch
+    first: `acme.sh --set-default-ca --server letsencrypt`, then `--register-account
+    --email you@example.com` (one-time), THEN `--issue -d <d> --webroot <dir>`. This applies
+    to the bundled acme.sh on Tencent-Cloud-customized Baota.
+
+12. **`--install-cert` does NOT create the target cert dir**. `acme.sh --install-cert -d <d>
+    --cert-file ... --key-file ... --fullchain-file ...` errors if
+    `/www/server/panel/vhost/cert/<d>/` does not exist. `mkdir -p` it before `install-cert`.
+    Note the split: `--issue` creates `~/ .acme.sh/<d>_ecc/` (the source certs), but NOT the
+    panel cert dir where nginx expects to read them.
+
+13. **`AddSite` writes via `init_site_files` + `nginxAdd`**, which OVERWRITE root `index.html`
+    (with a Baota placeholder) and the vhost conf (with a default HTTP config). Always
+    **back up both before calling `AddSite`, then restore after** and `nginx -s reload` —
+    otherwise your real page + SSL vhost get clobbered (caught and fixed this way on fanqie).
+
+14. **Run panel models via the panel's own pyenv**, not system python: `/www/server/panel/pyenv/bin/python`
+    with `sys.path.insert(0,'/www/server/panel/class'); import public, panelSite`. System
+    python lacks the `bt` modules and `public.M`/`db.Sql` bindings. Pass the SSH password only
+    via an env var (`SSH_PWD`) to a local wrapper; never embed it in files.
 
 ## References
 
